@@ -1,0 +1,28 @@
+# .NET
+backend/**/bin/
+backend/**/obj/
+*.user
+*.suo
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Environment (exclude local overrides, but keep frontend/.env which is required for the challenge)
+.env.local
+.env.*.local
+/.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.sln.DotSettings.user
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml
+
