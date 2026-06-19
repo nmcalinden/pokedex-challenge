@@ -6,7 +6,7 @@ services:
       POSTGRES_PASSWORD: pokedex
       POSTGRES_DB: pokedex
     ports:
-      - "5433:5432"
+      - "5438:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -15,28 +15,27 @@ services:
       timeout: 3s
       retries: 5
 
-  api:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    ports:
-      - "5001:5001"
+  # One-shot migration runner. It scans the whole database/ folder, so a single
+  # Flyway run applies both the versioned schema migrations (migrations/) and the
+  # local mock-data seed (local-data-seed/). In CI/production, point Flyway at
+  # database/migrations only so the local seed is never applied.
+  #
+  # The API and UI are NOT run here — they run natively (see `make dev`). Docker
+  # only provides the database and migrations.
+  flyway:
+    image: flyway/flyway:11-alpine
+    command: -connectRetries=10 migrate
     environment:
-      - ConnectionStrings__DefaultConnection=Host=db;Database=pokedex;Username=pokedex;Password=pokedex
-      - ASPNETCORE_URLS=http://+:5001
-      - ASPNETCORE_ENVIRONMENT=Development
+      FLYWAY_URL: jdbc:postgresql://db:5432/pokedex
+      FLYWAY_USER: pokedex
+      FLYWAY_PASSWORD: pokedex
+      FLYWAY_LOCATIONS: filesystem:/flyway/database
+      FLYWAY_BASELINE_ON_MIGRATE: "true"
+    volumes:
+      - ./database:/flyway/database:ro
     depends_on:
       db:
         condition: service_healthy
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "3000:3000"
-    depends_on:
-      - api
 
 volumes:
   pgdata:

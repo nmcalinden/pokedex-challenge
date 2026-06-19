@@ -1,0 +1,18 @@
+# Flyway configuration — EXAMPLE.
+#
+# Most workflows do NOT need this file: `make migrate` runs Flyway through
+# Docker Compose with the right settings baked in. Copy this to `flyway.conf`
+# (which is gitignored) only if you want to run the Flyway CLI directly against
+# a local database.
+
+flyway.url=jdbc:postgresql://localhost:5433/pokedex
+flyway.user=pokedex
+flyway.password=pokedex
+
+# Local: apply the schema migrations AND the local mock-data seed.
+# In CI/production, use only `filesystem:./migrations` so the seed is skipped.
+flyway.locations=filesystem:./migrations,filesystem:./local-data-seed
+flyway.schemas=public
+
+# Baseline a non-empty schema instead of failing (harmless on a fresh database).
+flyway.baselineOnMigrate=true

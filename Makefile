@@ -1,4 +1,4 @@
-.PHONY: help install frontend backend db up down test test-backend test-frontend clean
+.PHONY: help install dev server ui db migrate down clean
 
 DOTNET_ROOT ?= /usr/local/opt/dotnet/libexec
 export DOTNET_ROOT
@@ -10,40 +10,38 @@ help: ## Show available targets
 # ── Install ──────────────────────────────────────────────────────
 
 install: ## Install dependencies for both projects
-	cd frontend && npm install --include=dev
-	cd backend && dotnet restore
+	cd ui && npm install --include=dev
+	cd server && dotnet restore
 
-# ── Local development ────────────────────────────────────────────
+# ── Run ───────────────────────────────────────────────────────────
 
-frontend: ## Start the React dev server on :3000
-	cd frontend && npm run dev
+dev: db migrate ## Run the app: DB + migrations in Docker, API + UI natively (Ctrl+C stops both)
+	cd ui && npm install
+	@echo "API → http://localhost:5001   UI → http://localhost:3000   (Ctrl+C stops both)"
+	@trap 'kill 0' EXIT; \
+		( cd server && ASPNETCORE_URLS=http://localhost:5001 dotnet run --project Pokedex.Api ) & \
+		( cd ui && npm run dev ) & \
+		wait
 
-backend: ## Start the .NET API on :5001 (requires PostgreSQL)
-	cd backend && dotnet run --project Pokedex.Api
+server: ## Run just the API on :5001 (dotnet; needs the DB)
+	cd server && ASPNETCORE_URLS=http://localhost:5001 dotnet run --project Pokedex.Api
 
-db: ## Start PostgreSQL via Docker Compose
+ui: ## Run just the UI on :3000 (npm)
+	cd ui && npm run dev
+
+# ── Database (Docker) ─────────────────────────────────────────────
+
+db: ## Start PostgreSQL (Docker)
 	docker compose up db -d
 
-# ── Docker Compose ───────────────────────────────────────────────
+migrate: ## Apply Flyway migrations + local seed (scans database/; needs the DB)
+	docker compose run --rm flyway -connectRetries=10 migrate
 
-up: ## Start the full stack via Docker Compose
-	docker compose up --build
-
-down: ## Stop all Docker Compose services
+down: ## Stop the Docker services (database)
 	docker compose down
-
-# ── Tests ────────────────────────────────────────────────────────
-
-test: test-backend test-frontend ## Run all tests
-
-test-backend: ## Run .NET xUnit tests
-	cd backend && dotnet test
-
-test-frontend: ## Run Vitest tests
-	cd frontend && npm test
 
 # ── Cleanup ──────────────────────────────────────────────────────
 
 clean: ## Remove build artifacts
-	cd backend && dotnet clean
-	rm -rf frontend/dist frontend/node_modules/.vite
+	cd server && dotnet clean
+	rm -rf ui/dist ui/node_modules/.vite

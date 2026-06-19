@@ -2,302 +2,173 @@
 
 ## Overview
 
-This challenge evaluates your ability to build and extend a full-stack application using **React with TypeScript** on the front end and **.NET with C#** on the back end. The project is a Pokédex that fetches data from the [PokéAPI](https://pokeapi.co/), displays it through a React UI, and persists user data via a .NET API backed by PostgreSQL.
+A take-home that assesses senior-level, full-stack engineering across the whole
+delivery lifecycle: a **React + TypeScript** front end, a **.NET + C#** API, a
+**PostgreSQL** database, and the **infrastructure and pipeline** to test and ship
+it on **AWS**.
 
-The initial scaffold includes a working reference implementation — a paginated Pokémon list endpoint that returns the first page of results. You are expected to extend this foundation and implement additional features across both the front end and back end.
+We're evaluating **judgment and ownership**, not the ability to follow a spec.
+This brief deliberately states *what* we're looking for and leaves the *how* —
+architecture, tooling, trade-offs — to you. A few well-reasoned, well-tested,
+production-minded changes tell us far more than ticking off every box.
 
-**Time box:** You should spend at most **4 hours** on this challenge. There is no requirement to complete every task — focus on solid, well-structured implementations rather than rushing through all of them.
+## What's provided
 
----
+A small, runnable baseline — the rest is yours to build:
 
-## Prerequisites
+- A working `GET /api/pokemon` endpoint that proxies and caches the
+  [PokéAPI](https://pokeapi.co/) list.
+- A minimal React app (list + detail views) wired to that API.
+- PostgreSQL and **Flyway** wired into the stack — but with **no schema**.
+- `make dev` runs it locally — PostgreSQL (with migrations) in Docker, the API and UI natively.
 
-### Docker Path (Recommended)
+It is intentionally minimal and a little rough around the edges. Applying good
+structure, RESTful conventions, and consistent UI patterns as you extend it — and
+tidying the rough edges you come across — is part of the exercise.
 
-You only need **[Docker Desktop](https://www.docker.com/products/docker-desktop/)** installed. All services (database, API, frontend) run in containers.
-
-### Local Development Path
-
-If you prefer running services outside Docker:
-
-- **Node.js 22 LTS** — [Download](https://nodejs.org/)
-- **.NET 10 SDK** — [Download](https://dotnet.microsoft.com/download/dotnet/10.0)
-- **PostgreSQL 17** — [Download](https://www.postgresql.org/download/)
-
----
-
-## Quick Start
-
-```bash
-# Clone and start everything
-git clone <repository-url>
-cd <repository-name>
-docker compose up --build
-```
-
-Once running:
-- **Frontend:** [http://localhost:3000](http://localhost:3000)
-- **API:** [http://localhost:5001/api/pokemon](http://localhost:5001/api/pokemon)
-
-The database schema is applied automatically when the API starts — no manual migration commands are needed.
-
-### Local Development (Without Docker)
+## Getting started
 
 ```bash
-# Terminal 1: Start PostgreSQL (if not already running)
-# Ensure a database named 'pokedex' exists with user/password 'pokedex'
-
-# Terminal 2: Start the API
-cd backend
-dotnet run --project Pokedex.Api
-
-# Terminal 3: Start the frontend
-cd frontend
-npm install
-npm run dev
+make dev
 ```
 
----
+`make dev` runs **PostgreSQL and the migrations in Docker**, then runs the **API
+(`dotnet`) and UI (`npm`) natively**, streaming both. Stop everything with Ctrl+C.
 
-## Architecture
+- **UI:** http://localhost:3000
+- **API:** http://localhost:5001/api/pokemon
 
+Prefer to run the pieces yourself (e.g. in separate terminals)?
+
+```bash
+make db        # PostgreSQL (Docker)
+make migrate   # apply Flyway migrations + local seed (Docker; a no-op until you add some)
+make server    # API on :5001 (dotnet)
+make ui        # UI on :3000 (npm)
 ```
-┌─────────────┐     ┌──────────────┐     ┌──────────────┐
-│   React UI  │────▶│  .NET API    │────▶│   PokéAPI    │
-│  :3000      │     │  :5001       │     │  (external)  │
-└─────────────┘     └──────┬───────┘     └──────────────┘
-                           │
-                    ┌──────▼───────┐
-                    │  PostgreSQL  │
-                    │  :5433       │
-                    └──────────────┘
-```
 
-- **React frontend** (`frontend/`) — Vite + TypeScript + TanStack React Query
-- **.NET API** (`backend/`) — ASP.NET Core Web API + Entity Framework Core
-- **PostgreSQL** — Stores user favourites; managed via EF Core Migrations
-- **PokéAPI** — External data source for Pokémon information; responses are cached in-memory (5-minute TTL)
+Requirements: Node.js 22, .NET 10 SDK, and Docker (for the database). Versions are
+pinned in `.nvmrc`, `.tool-versions`, and `server/global.json`.
 
----
+## Functional requirements
+
+Where the app needs to get to, described as outcomes — the *how* (data model,
+endpoints, components, state) is yours to decide.
+
+- **Browse the Pokédex.** View Pokémon as a list / grid.
+- **View a Pokémon.** Open one and see its details — sprite, types, base stats,
+  abilities, and so on.
+- **Favourites.** Mark and unmark Pokémon as favourites and view the current user's
+  favourites; they persist and are scoped to the user (see
+  [Authentication](#authentication)).
+- **Compare Pokémon.** Pick two or more and compare them side by side (e.g. base
+  stats and types).
+- **Find Pokémon.** Search by name and / or filter by type.
+
+Data comes from the [PokéAPI](https://pokeapi.co/) and the database you design.
+The starter already does a basic browse + detail view — extend from there.
+
+## Engineering goals
+
+How well you build the above is what we're assessing. Treat these as outcomes, not
+instructions; scope to the time agreed with your reviewer — **depth beats breadth**.
+
+- **Designed database (Flyway).** Model a sensible schema and evolve it with
+  versioned Flyway migrations in [`database/migrations`](database/migrations)
+  (applied in every environment). Put mock data for local development in
+  [`database/local-data-seed`](database/local-data-seed) — the local stack loads
+  it; CI and production never do.
+- **RESTful API.** Expose the functionality above through an API that follows REST
+  best practices — sensible resource naming, correct status codes, consistent error
+  shapes (RFC 7807), input validation, and a clean separation of concerns.
+- **UI with a clear structure.** Deliver the features in the React app with a
+  **clear folder structure and consistent conventions**, a typed data flow, and
+  reasonable UX.
+- **Tests.** Meaningful automated tests at both the **unit** and **integration**
+  levels, on **server and UI** — set up the tooling and write the tests.
+- **CI/CD.** Wire build, tests, and deployment into **GitHub Actions**.
+- **Infrastructure (IaC).** Describe the cloud infrastructure as code with
+  **Terraform** and deploy/host the application on **AWS**.
+
+You are not expected to complete everything. Tell us what you prioritised, what
+you'd do next, and the trade-offs you made.
+
+## Stretch goals
+
+We don't spell these out as requirements — recognising they're needed and adding
+them is part of the signal:
+
+- **Pagination / infinite scroll** — the Pokédex is large; don't fetch it all at once.
+- **Caching** — a considered strategy (the starter only caches the list endpoint);
+  avoid hammering PokéAPI and keep the UI responsive.
+- **Sorting and richer search / filtering.**
+
+And, as time allows:
+
+- End-to-end (Playwright) and load (k6) tests.
+- Observability — structured logging, health / readiness endpoints, metrics.
+- Resilience — timeouts / retries, rate limiting.
+- Accessibility and responsive polish.
+- Multi-environment IaC, zero-downtime deploys / rollback, deeper secrets handling.
 
 ## Authentication
 
-The favourites feature uses a **static Bearer token** for user identification. There is no login flow or JWT validation — the token is a simple string that scopes database operations to a specific user session.
+The favourites capability identifies a user with a **static Bearer token** — there
+is no login or JWT validation, just a string that scopes a user's data.
 
-### How It Works
+- The token is defined in `ui/.env` as `VITE_SESSION_TOKEN` and sent as
+  `Authorization: Bearer <token>` (the `apiFetch` helper in
+  `ui/src/api/client.ts` already attaches it).
+- The API should read the raw token from the header and scope favourites to it —
+  no cryptographic validation required.
 
-1. The token value is defined in `frontend/.env`:
-   ```
-   VITE_SESSION_TOKEN=pokedex-challenge-2027-a1b2c3d4-e5f6-7890-abcd-ef1234567890
-   ```
+## API reference
 
-2. The frontend's `apiFetch()` helper (in `src/api/client.ts`) attaches it to every request:
-   ```
-   Authorization: Bearer pokedex-challenge-2027-a1b2c3d4-e5f6-7890-abcd-ef1234567890
-   ```
-
-3. The backend reads the token from the `Authorization` header and uses it to scope all favourites database queries to that token value. The token is stored in the `token` column of the `favourites` table.
-
-**Key details:**
-- **Header:** `Authorization`
-- **Format:** `Bearer <token>`
-- **Token value:** Read from the `VITE_SESSION_TOKEN` environment variable
-- **Backend behaviour:** Extract the raw token string from the header — no cryptographic validation required
-
----
-
-## Your Tasks
-
-### Backend Tasks
-
-#### Backend Task 1: Extend Paginated Pokémon List
-
-**File:** `backend/Pokedex.Api/Controllers/PokemonController.cs`
-
-The existing `GET /api/pokemon` endpoint returns the first page of results (offset=0, limit=20). Extend it to accept `offset` and `limit` query parameters for arbitrary pagination.
-
-- Validate: `offset >= 0`, `1 <= limit <= 100`
-- Return appropriate error responses for invalid parameters
-- [PokéAPI Pagination Docs](https://pokeapi.co/docs/v2#resource-listspagination-section)
-
-#### Backend Task 2: Implement Favourites API
-
-**File:** `backend/Pokedex.Api/Controllers/FavouritesController.cs`
-
-Implement CRUD endpoints for user favourites, scoped to the authenticated user's token:
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/favourites` | List all favourites for the current user |
-| `POST` | `/api/favourites` | Add a favourite (`{ "pokemonId": <int> }`) |
-| `DELETE` | `/api/favourites/{pokemonId}` | Remove a favourite |
-
-- Return `401` if the `Authorization` header is missing or malformed
-- Return `409` if the Pokémon is already favourited
-- Return `404` on DELETE if the favourite doesn't exist
-- The `Favourite` entity and database migration are already provided
-
-#### Backend Task 3: Type Statistics Aggregation
-
-**File:** `backend/Pokedex.Api/Controllers/PokemonController.cs`
-
-Add a `GET /api/pokemon/types/stats` endpoint that returns aggregated statistics for each Pokémon type. For each type, return:
-- The type name (e.g. "fire", "water")
-- The count of Pokémon with that type
-- The average value of each base stat (hp, attack, defense, special-attack, special-defense, speed)
-
-- [PokéAPI Pokémon Docs](https://pokeapi.co/docs/v2#pokemon)
-
-#### Backend Task 4: Pokémon Detail Proxy with Species Enrichment
-
-**File:** `backend/Pokedex.Api/Controllers/PokemonController.cs`
-
-Add a `GET /api/pokemon/{id}` endpoint that returns an enriched detail response composed from multiple PokéAPI sources:
-
-1. Core data (name, height, weight, sprites, types, stats, abilities) from `/pokemon/{id}`
-2. Species description (English flavour text) from `/pokemon-species/{id}`
-3. Evolution chain from the URL in the species response
-
-Consider how to structure your service layer, caching strategy, and graceful degradation for partial upstream failures.
-
-- [PokéAPI Pokémon](https://pokeapi.co/docs/v2#pokemon) · [Species](https://pokeapi.co/docs/v2#pokemon-species) · [Evolution Chains](https://pokeapi.co/docs/v2#evolution-chains)
-
-### Frontend Tasks
-
-#### Frontend Task 1: Add Pagination
-
-**File:** `frontend/src/api/hooks/usePokemonList.ts`
-
-The current hook fetches only the first page. Implement infinite scroll or a "Load More" button using `useInfiniteQuery` from TanStack React Query.
-
-- [TanStack Infinite Queries](https://tanstack.com/query/latest/docs/framework/react/guides/infinite-queries)
-
-#### Frontend Task 2: Style the Detail Page
-
-**File:** `frontend/src/pages/PokemonDetailPage.tsx`
-
-Apply a polished layout with proper spacing, typography, and colours. Show the Pokémon sprite, name, types, and stats in a visually appealing way. Creative freedom is encouraged — no Figma reference is provided. Ensure the layout works on different screen sizes.
-
-#### Frontend Task 3: Add Favouriting
-
-**File:** `frontend/src/pages/FavouritesPage.tsx`
-
-Implement the favourites feature using the API endpoints from Backend Task 2:
-- Display favourited Pokémon on the Favourites page
-- Add favourite/unfavourite toggles on the list and detail pages
-- Use `useMutation` from TanStack React Query with cache invalidation
-
-#### Frontend Task 4: Add Type Filtering
-
-**File:** `frontend/src/pages/PokemonListPage.tsx`
-
-Allow users to filter the Pokémon list by type:
-- Fetch types from `GET https://pokeapi.co/api/v2/type`
-- When selected, fetch Pokémon of that type
-- Allow clearing/changing the filter
-
-- [PokéAPI Types](https://pokeapi.co/docs/v2#types)
-
----
-
-## API Reference
-
-### Working Endpoint (Reference Implementation)
+The one provided endpoint, as a reference for the response/error style:
 
 ```
-GET /api/pokemon
-```
-
-**Response (200 OK):**
-```json
+GET /api/pokemon  →  200 OK
 {
-  "count": 1302,
-  "offset": 0,
-  "limit": 20,
-  "results": [
-    { "name": "bulbasaur", "url": "https://pokeapi.co/api/v2/pokemon/1/" },
-    { "name": "ivysaur", "url": "https://pokeapi.co/api/v2/pokemon/2/" }
-  ]
+  "count": 1302, "offset": 0, "limit": 20,
+  "results": [ { "name": "bulbasaur", "url": "https://pokeapi.co/api/v2/pokemon/1/" } ]
 }
 ```
 
-### Error Format (RFC 7807 Problem Details)
-
-All API errors return a consistent JSON format:
+Errors use RFC 7807 Problem Details (`application/problem+json`):
 
 ```json
-{
-  "type": "https://tools.ietf.org/html/rfc7231#section-6.6.3",
-  "title": "Bad Gateway",
-  "status": 502,
-  "detail": "Unable to retrieve Pokémon data from the upstream PokéAPI service."
-}
+{ "type": "...", "title": "Bad Gateway", "status": 502, "detail": "..." }
 ```
 
-This pattern is demonstrated in the reference endpoint — use it consistently for all error responses.
-
----
-
-## Running Tests
-
-```bash
-# Backend (xUnit)
-cd backend
-dotnet test
-
-# Frontend (Vitest)
-cd frontend
-npm test
-```
-
-Both projects have a configured test runner with at least one passing example test. Use these as a starting point for your own tests.
-
----
-
-## Project Structure
+## Project structure
 
 ```
-├── backend/
-│   ├── Pokedex.Api/              # .NET 10 Web API
-│   │   ├── Controllers/          # API endpoints
-│   │   ├── Services/             # PokéAPI proxy with caching
-│   │   ├── Models/               # DTOs and EF Core entities
-│   │   ├── Data/                 # DbContext configuration
-│   │   ├── Migrations/           # EF Core database migrations
-│   │   └── Program.cs            # Application entry point
-│   ├── Pokedex.Api.Tests/        # Integration tests (xUnit)
-│   └── Dockerfile
-├── frontend/
-│   ├── src/
-│   │   ├── api/                  # API client and React Query hooks
-│   │   ├── components/           # Reusable UI components
-│   │   ├── pages/                # Route pages
-│   │   └── types/                # TypeScript interfaces
-│   ├── .env                      # API URL and session token
-│   └── Dockerfile
-├── docker-compose.yml            # Full-stack orchestration
-└── README.md                     # This file
+├── server/                 # .NET 10 Web API
+│   └── Pokedex.Api/
+│       ├── Controllers/    # API endpoints (provided: GET /api/pokemon)
+│       ├── Services/       # PokéAPI proxy with caching
+│       ├── Models/         # DTOs
+│       ├── Data/           # DbContext (database wired; no entities yet)
+│       └── Program.cs
+├── ui/                     # React + TypeScript + Vite + TanStack Query
+│   └── src/                # api client, hooks, components, pages, types
+├── database/               # Flyway migrations + local mock-data seed
+├── docker-compose.yml      # PostgreSQL + Flyway (local dev only)
+├── Makefile
+└── README.md
 ```
 
----
+## Technical expectations
 
-## Technical Expectations
-
-- Use modern patterns for both frameworks (hooks, functional components, dependency injection, async/await)
-- Keep classes, components, and services focused and well-structured
-- Write clear, self-explanatory code
-- Implement reasonable error handling throughout
-- Add tests where appropriate — both projects have a test runner configured
-
-You do **not** need to:
-- Complete every task — quality over quantity
-- Over-engineer or introduce unnecessary abstractions
-- Achieve pixel-perfect styling — a clean, functional layout is sufficient
-
----
+- Use modern, idiomatic patterns for both frameworks.
+- Keep components, services, and modules focused and well-structured.
+- Handle errors and edge cases reasonably.
+- Make deliberate choices and be ready to explain them.
 
 ## Submission
 
-Please provide:
-- A link to your completed repository
-- Any brief notes or trade-offs you feel are worth calling out
+Please share:
+
+- A link to your repository.
+- Brief notes on your approach: what you prioritised, key trade-offs, and what
+  you'd do next with more time.
